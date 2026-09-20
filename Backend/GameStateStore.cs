@@ -1,16 +1,32 @@
-using System.Collections.Concurrent;
+using System.Text.Json;
 
 public sealed class GameStateStore
 {
-    private readonly ConcurrentDictionary<string, PlayerDataDTO> _players = new();
+    private readonly GameDbContext _database;
 
-    public PlayerDataDTO GetPlayerData(string playerId) =>
-        _players.GetOrAdd(playerId, PlayerDataDTO.Create);
+    public GameStateStore(GameDbContext database)
+    {
+        _database = database;
+    }
+
+    public PlayerDataDTO GetPlayerData(string playerId)
+    {
+        var record = _database.PlayerData.SingleOrDefault(player => player.PlayerId == playerId);
+        return record is null ? CreatePlayer(playerId) : Deserialize(record.State);
+    }
 
     public PlayerDataDTO SavePlayerData(string playerId, PlayerDataDTO playerData)
     {
         playerData.PlayerId = playerId;
-        _players[playerId] = playerData;
+        var record = _database.PlayerData.SingleOrDefault(player => player.PlayerId == playerId);
+        if (record is null)
+        {
+            record = new PlayerDataRecord { PlayerId = playerId };
+            _database.PlayerData.Add(record);
+        }
+
+        record.State = JsonSerializer.Serialize(playerData);
+        _database.SaveChanges();
         return playerData;
     }
 
@@ -20,6 +36,7 @@ public sealed class GameStateStore
         lock (state)
         {
             state.Points += state.ClickValue;
+            SavePlayerData(playerId, state);
             return state;
         }
     }
@@ -40,9 +57,20 @@ public sealed class GameStateStore
                 upgrade.Cost = (int)(upgrade.Cost * 1.15);
             }
 
+            SavePlayerData(playerId, state);
             return state;
         }
     }
+
+    private PlayerDataDTO CreatePlayer(string playerId)
+    {
+        var state = PlayerDataDTO.Create(playerId);
+        SavePlayerData(playerId, state);
+        return state;
+    }
+
+    private static PlayerDataDTO Deserialize(string state) =>
+        JsonSerializer.Deserialize<PlayerDataDTO>(state) ?? PlayerDataDTO.Create(string.Empty);
 }
 
 public sealed class UpgradeData
