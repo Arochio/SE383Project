@@ -40,6 +40,15 @@ ScaffoldingReadMe.txt
 ~$*
 *~
 CodeCoverage/
+# Ignore .vs and .github contents except solution files.
+**/.vs/
+**/.vs/*
+!**/.vs/**/*.sln
+!**/.vs/**/*.slnx
+**/.github/
+**/.github/*
+!**/.github/**/*.sln
+!**/.github/**/*.slnx
 
 # MSBuild Binary and Structured Log
 *.binlog
@@ -51,4 +60,4 @@ CodeCoverage/
 # NUnit
 *.VisualState.xml
 TestResult.xml
-nunit-*.xml
+nunit-*.xml"

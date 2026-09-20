@@ -1,10 +1,73 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Incremental Clicker Game";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="clicker-container">
+    <div class="game-header">
+        <h1>Clicker Empire</h1>
+        <div class="score-display">
+            <span class="score-label">Points:</span>
+            <span class="score-value" id="pointsDisplay">@Model.Points</span>
+        </div>
+    </div>
+
+    <div class="game-content">
+        <!-- Main Clicker Section -->
+        <div class="clicker-section">
+            <div class="click-button-container">
+                <form method="post" asp-page-handler="Click" id="clickForm" class="d-inline">
+                    <button type="submit" class="click-button" id="clickBtn">
+                        <span class="click-text">CLICK!</span>
+                        <span class="click-value">+@Model.ClickValue</span>
+                    </button>
+                </form>
+            </div>
+            <div class="game-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Click Value:</span>
+                    <span class="stat-value" id="clickValueDisplay">@Model.ClickValue</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upgrades Pane -->
+        <div class="upgrades-pane">
+            <h2>Upgrades</h2>
+            <div class="upgrades-list" id="upgradesList">
+                @foreach (var upgrade in Model.Upgrades.Values.OrderBy(u => u.Cost))
+                {
+                    var canAfford = Model.Points >= upgrade.Cost;
+                    <div class="upgrade-card @(!canAfford ? "disabled" : "")">
+                        <div class="upgrade-header">
+                            <h3 class="upgrade-name">@upgrade.Name</h3>
+                            <span class="upgrade-level">Lvl: @upgrade.Level</span>
+                        </div>
+                        <p class="upgrade-description">@upgrade.Description</p>
+                        @if (upgrade.PointsPerSecond > 0)
+                        {
+                            <p class="upgrade-stat">+@upgrade.PointsPerSecond pts/sec</p>
+                        }
+                        @if (upgrade.ClickMultiplier > 1)
+                        {
+                            <p class="upgrade-stat">x@upgrade.ClickMultiplier click value</p>
+                        }
+                        <form method="post" asp-page-handler="BuyUpgrade" class="upgrade-form">
+                            <input type="hidden" name="upgradeId" value="@upgrade.Id" />
+                            <button type="submit" 
+                                    class="upgrade-button @(!canAfford ? "btn-disabled" : "")" 
+                                    @(!canAfford ? "disabled" : "")>
+                                Cost: <span class="upgrade-cost">@upgrade.Cost</span>
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/clicker-game.js" asp-append-version="true"></script>
+}
