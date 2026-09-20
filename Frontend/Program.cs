@@ -2,6 +2,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddHttpClient("Backend", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["BackendUrl"] ?? "http://localhost:5228");
+});
 
 var app = builder.Build();
 

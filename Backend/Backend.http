@@ -1,6 +1,44 @@
 @Backend_HostAddress = http://localhost:5228
+@GameId = demo-player-001
 
-GET {{Backend_HostAddress}}/weatherforecast/
+### Get the player's current data
+GET {{Backend_HostAddress}}/api/game
 Accept: application/json
+X-Game-Id: {{GameId}}
 
-###
+# Expected response: 200 OK
+# {
+#   "playerId": "demo-player-001",
+#   "points": 0,
+#   "clickValue": 1,
+#   "upgrades": { }
+# }
+
+### Click and update the player's points
+POST {{Backend_HostAddress}}/api/game/click
+Accept: application/json
+X-Game-Id: {{GameId}}
+
+# Expected response: 200 OK with points increased by clickValue
+
+### Buy an upgrade
+POST {{Backend_HostAddress}}/api/game/upgrades/double-click
+Accept: application/json
+X-Game-Id: {{GameId}}
+
+# Expected response: 200 OK with the double-click upgrade level increased
+
+### Save player data for a future database-backed implementation
+PUT {{Backend_HostAddress}}/api/game
+Content-Type: application/json
+Accept: application/json
+X-Game-Id: {{GameId}}
+
+{
+  "playerId": "demo-player-001",
+  "points": 100,
+  "clickValue": 2,
+  "upgrades": {}
+}
+
+# Expected response: 200 OK with the saved PlayerDataDTO
