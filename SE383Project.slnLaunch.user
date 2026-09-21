@@ -1,0 +1,19 @@
+[
+  {
+    "Name": "Main",
+    "Projects": [
+      {
+        "Path": "Backend\\Backend.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "Database\\Database.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "Frontend\\Frontend.csproj",
+        "Action": "StartWithoutDebugging"
+      }
+    ]
+  }
+]
