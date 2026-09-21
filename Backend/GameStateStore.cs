@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 public sealed class GameStateStore
 {
+    private static readonly ConcurrentDictionary<string, DateTime> LastIncomeAt = new();
     private readonly GameDbContext _database;
 
     public GameStateStore(GameDbContext database)
@@ -14,7 +16,18 @@ public sealed class GameStateStore
         var record = _database.PlayerData
             .Include(player => player.Upgrades)
             .SingleOrDefault(player => player.PlayerId == playerId);
-        return record is null ? CreatePlayer(playerId) : ToDto(record);
+        if (record is null)
+            return CreatePlayer(playerId);
+
+        var state = ToDto(record);
+        var calculatedClickValue = CalculateClickValue(state);
+        if (state.ClickValue != calculatedClickValue)
+        {
+            state.ClickValue = calculatedClickValue;
+            SavePlayerData(playerId, state);
+        }
+        ApplyPassiveIncome(playerId, state);
+        return state;
     }
 
     public PlayerDataDTO SavePlayerData(string playerId, PlayerDataDTO playerData)
@@ -71,6 +84,22 @@ public sealed class GameStateStore
         }
     }
 
+    private void ApplyPassiveIncome(string playerId, PlayerDataDTO state)
+    {
+        var now = DateTime.UtcNow;
+        var lastIncome = LastIncomeAt.GetOrAdd(playerId, now);
+        var elapsedSeconds = (long)(now - lastIncome).TotalSeconds;
+        var pointsPerSecond = state.Upgrades.Values
+            .Sum(upgrade => (long)upgrade.PointsPerSecond * upgrade.Level);
+
+        if (elapsedSeconds <= 0 || pointsPerSecond <= 0)
+            return;
+
+        state.Points += elapsedSeconds * pointsPerSecond;
+        LastIncomeAt[playerId] = lastIncome.AddSeconds(elapsedSeconds);
+        SavePlayerData(playerId, state);
+    }
+
     public PlayerDataDTO BuyUpgrade(string playerId, string upgradeId)
     {
         var state = GetPlayerData(playerId);
@@ -80,10 +109,7 @@ public sealed class GameStateStore
             {
                 state.Points -= upgrade.Cost;
                 upgrade.Level++;
-                if (upgradeId == "double-click")
-                    state.ClickValue = 2;
-                else if (upgradeId == "click-frenzy")
-                    state.ClickValue = 5;
+                state.ClickValue = CalculateClickValue(state);
                 upgrade.Cost = (int)(upgrade.Cost * 1.15);
             }
 
@@ -117,6 +143,17 @@ public sealed class GameStateStore
                 Level = upgrade.Level
             })
     };
+
+    private static int CalculateClickValue(PlayerDataDTO state)
+    {
+        var clickValue = state.Upgrades.Values
+            .Where(upgrade => upgrade.Level > 0 && upgrade.ClickMultiplier > 1)
+            .GroupBy(upgrade => upgrade.ClickMultiplier)
+            .Select(group => (long)group.Key * group.Sum(upgrade => upgrade.Level))
+            .Aggregate(1L, (value, groupTotal) => value * groupTotal);
+
+        return checked((int)clickValue);
+    }
 }
 
 public sealed class UpgradeData

@@ -12,6 +12,7 @@ public sealed class GameDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<PlayerDataRecord>().ToTable("PlayerData");
         modelBuilder.Entity<PlayerDataRecord>().HasKey(player => player.PlayerId);
         modelBuilder.Entity<PlayerDataRecord>().Property(player => player.PlayerId).HasMaxLength(450);
 
@@ -21,6 +22,7 @@ public sealed class GameDbContext : DbContext
             .HasForeignKey(upgrade => upgrade.PlayerId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<UpgradeDataRecord>().ToTable("UpgradeData");
         modelBuilder.Entity<UpgradeDataRecord>().HasKey(upgrade => new { upgrade.PlayerId, upgrade.UpgradeId });
         modelBuilder.Entity<UpgradeDataRecord>().Property(upgrade => upgrade.PlayerId).HasMaxLength(450);
         modelBuilder.Entity<UpgradeDataRecord>().Property(upgrade => upgrade.UpgradeId).HasMaxLength(100);

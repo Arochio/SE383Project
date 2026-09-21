@@ -27,6 +27,11 @@ namespace Frontend.Pages
             ApplyState(await GetStateAsync());
         }
 
+        public async Task<IActionResult> OnGetStateAsync()
+        {
+            return new JsonResult(await GetStateAsync());
+        }
+
         public async Task<IActionResult> OnPostClickAsync()
         {
             ApplyState(await SendAsync(HttpMethod.Post, "api/game/click"));
