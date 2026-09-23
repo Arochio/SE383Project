@@ -9,7 +9,7 @@
         <h1>Clicker Empire</h1>
         <div class="score-display">
             <span class="score-label">Points:</span>
-            <span class="score-value" id="pointsDisplay">@Model.Points</span>
+            <span class="score-value" id="pointsDisplay" data-points-per-second="@Model.Upgrades.Values.Sum(upgrade => upgrade.PointsPerSecond * upgrade.Level)">@Model.Points</span>
         </div>
     </div>
 
@@ -47,11 +47,11 @@
                         <p class="upgrade-description">@upgrade.Description</p>
                         @if (upgrade.PointsPerSecond > 0)
                         {
-                            <p class="upgrade-stat">+@upgrade.PointsPerSecond pts/sec</p>
+                            <p class="upgrade-stat">+@(upgrade.PointsPerSecond) pts/sec</p>
                         }
                         @if (upgrade.ClickMultiplier > 1)
                         {
-                            <p class="upgrade-stat">x@upgrade.ClickMultiplier click value</p>
+                            <p class="upgrade-stat">x@(upgrade.ClickMultiplier) click value</p>
                         }
                         <form method="post" asp-page-handler="BuyUpgrade" class="upgrade-form">
                             <input type="hidden" name="upgradeId" value="@upgrade.Id" />

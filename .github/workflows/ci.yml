@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore solution
+        run: dotnet restore SE383Project.slnx
+
+      - name: Build solution
+        run: dotnet build SE383Project.slnx --configuration Release --no-restore
+
+      - name: Run backend tests
+        run: dotnet test Backend.Tests/Backend.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=backend-tests.trx"
+
+      - name: Run frontend tests
+        run: dotnet test Frontend.Tests/Frontend.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=frontend-tests.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/*.trx'
+          if-no-files-found: ignore
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet

@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const pointsDisplay = document.getElementById('pointsDisplay');
     const clickValueDisplay = document.getElementById('clickValueDisplay');
     const clickForm = document.getElementById('clickForm');
+    let displayedPoints = Number(pointsDisplay?.textContent ?? 0);
+    const pointsPerSecond = Number(pointsDisplay?.dataset.pointsPerSecond ?? 0);
 
     // Add click animation
     if (clickBtn) {
@@ -82,6 +84,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 card.classList.remove('disabled');
             }
         });
+    }
+
+    function updatePointsVisually() {
+        displayedPoints += pointsPerSecond;
+        if (pointsDisplay) {
+            pointsDisplay.textContent = Math.floor(displayedPoints).toString();
+        }
+    }
+
+    async function refreshPointsFromServer() {
+        try {
+            const response = await fetch('?handler=State', {
+                headers: { Accept: 'application/json' },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const state = await response.json();
+            displayedPoints = state.points;
+            if (pointsDisplay) {
+                pointsDisplay.textContent = displayedPoints.toString();
+            }
+        } catch {
+            // Keep the visual estimate until the next server refresh succeeds.
+        }
+    }
+
+    if (pointsDisplay && pointsPerSecond > 0) {
+        window.setInterval(() => {
+            updatePointsVisually();
+            refreshPointsFromServer();
+        }, 1000);
     }
 
     // Initial visual update

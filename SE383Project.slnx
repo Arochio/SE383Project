@@ -1,2 +1,11 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="Backend.Tests/Backend.Tests.csproj" />
+  <Project Path="Backend/Backend.csproj" />
+  <Project Path="Database/Database.csproj" Id="4343d8ed-0313-4486-9513-c9491374daf3" />
+  <Project Path="Frontend.Tests/Frontend.Tests.csproj" />
+  <Project Path="Frontend/Frontend.csproj" />
 </Solution>

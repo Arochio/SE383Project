@@ -45,10 +45,6 @@ CodeCoverage/
 **/.vs/*
 !**/.vs/**/*.sln
 !**/.vs/**/*.slnx
-**/.github/
-**/.github/*
-!**/.github/**/*.sln
-!**/.github/**/*.slnx
 
 # MSBuild Binary and Structured Log
 *.binlog

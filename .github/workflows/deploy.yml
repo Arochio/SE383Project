@@ -1,0 +1,170 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: true
+
+env:
+  RESOURCE_GROUP: SE383
+  ACI_NAME: se383project
+  ACR_NAME: se383containers
+  ACR_LOGIN_SERVER: se383containers.azurecr.io
+  LOCATION: southcentralus
+
+jobs:
+  deploy:
+    name: Build, push, and deploy
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push container images
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          docker build --target backend -t "$ACR_LOGIN_SERVER/se383-backend:$IMAGE_TAG" .
+          docker build --target frontend -t "$ACR_LOGIN_SERVER/se383-frontend:$IMAGE_TAG" .
+          docker build --target database -t "$ACR_LOGIN_SERVER/se383-database:$IMAGE_TAG" .
+          docker push "$ACR_LOGIN_SERVER/se383-backend:$IMAGE_TAG"
+          docker push "$ACR_LOGIN_SERVER/se383-frontend:$IMAGE_TAG"
+          docker push "$ACR_LOGIN_SERVER/se383-database:$IMAGE_TAG"
+
+      - name: Create ACI deployment definition
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          SQL_SA_PASSWORD: ${{ secrets.SQL_SA_PASSWORD }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          image_tag = os.environ["IMAGE_TAG"]
+          registry = os.environ["ACR_LOGIN_SERVER"]
+          sql_password = os.environ["SQL_SA_PASSWORD"]
+
+          deployment = {
+              "apiVersion": "2019-12-01",
+              "location": os.environ["LOCATION"],
+              "name": os.environ["ACI_NAME"],
+              "properties": {
+                  "osType": "Linux",
+                  "restartPolicy": "Always",
+                  "imageRegistryCredentials": [{
+                      "server": registry,
+                      "username": os.environ["ACR_USERNAME"],
+                      "password": os.environ["ACR_PASSWORD"],
+                  }],
+                  "containers": [
+                      {
+                          "name": "database",
+                          "properties": {
+                              "image": f"{registry}/se383-database:{image_tag}",
+                              "environmentVariables": [
+                                  {"name": "ACCEPT_EULA", "value": "Y"},
+                                  {"name": "MSSQL_PID", "value": "Developer"},
+                                  {"name": "MSSQL_SA_PASSWORD", "secureValue": sql_password},
+                              ],
+                              "resources": {"requests": {"cpu": 1, "memoryInGB": 2}},
+                          },
+                      },
+                      {
+                          "name": "backend",
+                          "properties": {
+                              "image": f"{registry}/se383-backend:{image_tag}",
+                              "environmentVariables": [
+                                  {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
+                                  {"name": "ASPNETCORE_HTTP_PORTS", "value": "8081"},
+                                  {
+                                      "name": "ConnectionStrings__GameDatabase",
+                                      "secureValue": (
+                                          "Server=localhost,1433;Database=ClickerEmpire;"
+                                          f"User Id=sa;Password={sql_password};"
+                                          "TrustServerCertificate=True"
+                                      ),
+                                  },
+                              ],
+                              "resources": {"requests": {"cpu": 0.5, "memoryInGB": 1}},
+                          },
+                      },
+                      {
+                          "name": "frontend",
+                          "properties": {
+                              "image": f"{registry}/se383-frontend:{image_tag}",
+                              "ports": [{"port": 8080}],
+                              "environmentVariables": [
+                                  {"name": "ASPNETCORE_ENVIRONMENT", "value": "Production"},
+                                  {"name": "BackendUrl", "value": "http://localhost:8081"},
+                              ],
+                              "resources": {"requests": {"cpu": 0.5, "memoryInGB": 1}},
+                          },
+                      },
+                  ],
+                  "ipAddress": {
+                      "type": "Public",
+                      "dnsNameLabel": "se383project-app",
+                      "ports": [{"protocol": "tcp", "port": 8080}],
+                  },
+              },
+          }
+
+          with open("aci-deployment.json", "w", encoding="utf-8") as file:
+              json.dump(deployment, file, indent=2)
+          PY
+
+      - name: Deploy container group to ACI
+        run: |
+          set -euo pipefail
+          az container delete \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$ACI_NAME" \
+            --yes \
+            --only-show-errors || true
+          az container create \
+            --resource-group "$RESOURCE_GROUP" \
+            --file aci-deployment.json \
+            --only-show-errors
+
+      - name: Verify deployment
+        run: |
+          set -euo pipefail
+          az container show \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$ACI_NAME" \
+            --query "{state:instanceView.state,fqdn:ipAddress.fqdn,containers:containers[].{name:name,state:instanceView.currentState.state}}" \
+            --output table
+
+      - name: Remove deployment definition
+        if: always()
+        run: rm -f aci-deployment.json
