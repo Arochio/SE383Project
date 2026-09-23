@@ -8,7 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<GameDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("GameDatabase")));
 builder.Services.AddScoped<GameStateStore>();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi!!!!!!!!!!!!!!!!!!!!!!!!
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
